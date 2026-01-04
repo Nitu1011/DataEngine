@@ -1,0 +1,49 @@
+import cx_Oracle   # to connect to DB
+import csv         # to save file
+import os          # for Path
+
+try:
+    connection = cx_Oracle.connect(
+        user="DEVMASTER",
+        password="devmaster12",
+        dsn="localhost:1521/XEPDB1",
+        encoding="UTF-8"
+    )
+    print("Connected to database")
+
+    cursor = connection.cursor()
+    query = input("WRITE QUERY TO BE EXECUTE:\n").strip()
+
+    if not query:
+        print("No query written")
+    else:
+        cursor.execute(query)
+
+        if cursor.description:
+            rows = cursor.fetchall()
+            if rows:
+                for row in rows:
+                    print(row)
+                    path = r"C:\Users\NITESH\Desktop\DataEngineer"   #to write on Path
+                    file_path = os.path.join(path, "output.csv")
+                with open(file_path, "w", newline="", encoding="utf-8") as file:
+                    writer = csv.writer(file)
+
+                    columns = [col[0] for col in cursor.description]  
+                    writer.writerow(columns)       # Write column headers
+                    writer.writerows(rows)         # Write data rows
+
+                    print("Data successfully written to " + file_path)
+
+            else:
+                print("No rows returned")
+        else:
+            connection.commit()
+            print(f"Query executed successfully. Rows affected: {cursor.rowcount}")
+
+    cursor.close()
+    connection.close()
+
+except cx_Oracle.Error as error:
+    print("DB connection failed")
+    print(error)
