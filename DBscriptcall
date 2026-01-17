@@ -1,0 +1,85 @@
+import cx_Oracle   # to connect to DB
+
+try:
+    connection = cx_Oracle.connect(
+        user="DEVMASTER",
+        password="devmaster12",
+        dsn="localhost:1521/XEPDB1",
+        encoding="UTF-8"
+    )
+    print("Connected to database")
+
+    cursor = connection.cursor()
+
+    history = []  # List to store executed queries
+
+    while True:
+        query = input("\nWRITE SCRIPT/QUERY TO BE EXECUTED (or type EXIT to quit, HISTORY to view past queries):\n").strip()
+
+        # Check for special commands
+        if query.lower() == "exit":
+            print("Exiting...")
+            break
+        if query.lower() == "history":
+            if history:
+                print("\n===== HISTORY OF EXECUTED QUERIES =====")
+                for i, q in enumerate(history, start=1):
+                    print(f"{i}. {q}")
+                print("======================================")
+            else:
+                print("No queries executed yet.")
+            continue
+
+        # Remove trailing semicolons
+        query = query.rstrip(';')
+
+        if not query:
+            print("No query written, try again.")
+            continue
+
+        # Convert SQL*Plus style EXEC calls into PL/SQL blocks
+        low = query.lower()
+        if low.startswith("exec ") or low.startswith("execute "):
+            if low.startswith("exec "):
+                proc_call = query[5:].strip()
+            else:
+                proc_call = query[8:].strip()
+            query_to_execute = f"BEGIN {proc_call}; END;"
+        else:
+            query_to_execute = query
+
+        # Save the original query to history
+        history.append(query)
+
+        try:
+            cursor.execute(query_to_execute)
+
+            # If the statement returned rows (SELECT)
+            if cursor.description:
+                rows = cursor.fetchall()
+                if rows:
+                    for row in rows:
+                        print(row)
+                else:
+                    print("No rows returned")
+            else:
+                # No result set; commit DML/PLSQL
+                connection.commit()
+                print(f"Query executed successfully. Rows affected: {cursor.rowcount}")
+
+        except cx_Oracle.Error as e:
+            print("Error executing your query/script:")
+            print(e)
+
+        # Ask user if they want to run another query
+        run_again = input("\nDo you want to execute another script or query? (y/n): ").strip().lower()
+        if run_again not in ("y", "yes"):
+            print("Goodbye!")
+            break
+
+    cursor.close()
+    connection.close()
+
+except cx_Oracle.Error as error:
+    print("DB connection failed")
+    print(error)
