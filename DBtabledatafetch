@@ -1,0 +1,99 @@
+import cx_Oracle   # to connect to DB
+
+try:
+    connection = cx_Oracle.connect(
+        user="DEVMASTER",
+        password="devmaster12",
+        dsn="localhost:1521/XEPDB1",
+        encoding="UTF-8"
+    )
+    print("Connected to database")
+
+    cursor = connection.cursor()
+
+    history = []  # List to store executed queries
+
+    while True:
+        query = input("\nWRITE TABLE NAME for which data is to be fetched (or type EXIT to quit, HISTORY to view past queries):\n").strip()
+
+        # add select clause 
+        all_col = input("Do you want to fetch all columns? (y/n): ").strip().lower()
+        if all_col in ("y", "yes"): 
+            query = "SELECT * FROM " + query
+        else:
+            cols = input("Enter the column names separated by commas, If you need column names Enter C\n").strip()
+            if cols.lower() == "c":
+                # Fetch column names from the specified table
+                try:
+                    cursor.execute(f"SELECT COLUMN_NAME FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = UPPER('{query}')")
+                    columns = cursor.fetchall()
+                    if columns:
+                        print("\nAvailable columns in the table: " + query)
+                        for col in columns:
+                            print(col[0])
+                    else:
+                        print("No columns found or table does not exist.")
+                except cx_Oracle.Error as e:
+                    print("Error fetching column names:")
+                    print(e)
+                continue  # Restart the loop to ask for table name again 
+            query = "SELECT " + cols + " FROM " + query        
+            
+        # Check for special commands
+        if query.lower() == "exit":
+            print("Exiting...")
+            break
+        if query.lower() == "history":
+            if history:
+                print("\n===== HISTORY OF EXECUTED QUERIES =====")
+                for i, q in enumerate(history, start=1):
+                    print(f"{i}. {q}")
+                print("======================================")
+            else:
+                print("No queries executed yet.")
+            continue
+
+        # Remove trailing semicolons
+        query = query.rstrip(';')
+
+        if not query:
+            print("No query written, try again.")
+            continue
+
+        query_to_execute = query.lower()
+
+        # Save the original query to history
+        history.append(query)
+
+        try:
+            cursor.execute(query_to_execute)
+
+            # If the statement returned rows (SELECT)
+            if cursor.description:
+                rows = cursor.fetchall()
+                if rows:
+                    for row in rows:
+                        print(row)
+                else:
+                    print("No rows returned")
+            else:
+                # No result set; commit DML/PLSQL
+                connection.commit()
+                print(f"Query executed successfully. Rows affected: {cursor.rowcount}")
+
+        except cx_Oracle.Error as e:
+            print("Error executing your query/script:")
+            print(e)
+
+        # Ask user if they want to run another query
+        run_again = input("\nDo you want to execute another script or query? (y/n): ").strip().lower()
+        if run_again not in ("y", "yes"):
+            print("Goodbye!")
+            break
+
+    cursor.close()
+    connection.close()
+
+except cx_Oracle.Error as error:
+    print("DB connection failed")
+    print(error)
